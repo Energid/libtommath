@@ -15,66 +15,69 @@
  * Tom St Denis, tstdenis82@gmail.com, http://libtom.org
  */
 
-#if MP_GEN_RANDOM_MAX == 0xffffffff
-  #define MP_GEN_RANDOM_SHIFT  32
+#if defined(MP_8BIT) || defined(MP_16BIT)
+#define MP_GEN_RANDOM_SHIFT  DIGIT_BIT
+#else
+#if MP_GEN_RANDOM_MAX == 0xffffffffu
+#define MP_GEN_RANDOM_SHIFT  32
 #elif MP_GEN_RANDOM_MAX == 32767
-  /* SHRT_MAX */
-  #define MP_GEN_RANDOM_SHIFT  15
+/* SHRT_MAX */
+#define MP_GEN_RANDOM_SHIFT  15
 #elif MP_GEN_RANDOM_MAX == 2147483647
-  /* INT_MAX */
-  #define MP_GEN_RANDOM_SHIFT  31
+/* INT_MAX */
+#define MP_GEN_RANDOM_SHIFT  31
 #elif !defined(MP_GEN_RANDOM_SHIFT)
 #error Thou shalt define their own valid MP_GEN_RANDOM_SHIFT
 #endif
+#endif
 
 /* makes a pseudo-random int of a given size */
-static mp_digit mp_gen_random(void)
+static mp_digit s_gen_random(void)
 {
-  mp_digit d = 0, msk = 0;
-  do {
-    d <<= MP_GEN_RANDOM_SHIFT;
-    d |= ((mp_digit) MP_GEN_RANDOM());
-    msk <<= MP_GEN_RANDOM_SHIFT;
-    msk |= MP_GEN_RANDOM_MAX;
-  } while ((MP_MASK & msk) != MP_MASK);
-  d &= MP_MASK;
-  return d;
+   mp_digit d = 0, msk = 0;
+   do {
+      d <<= MP_GEN_RANDOM_SHIFT;
+      d |= ((mp_digit) MP_GEN_RANDOM());
+      msk <<= MP_GEN_RANDOM_SHIFT;
+      msk |= (MP_MASK & MP_GEN_RANDOM_MAX);
+   } while ((MP_MASK & msk) != MP_MASK);
+   d &= MP_MASK;
+   return d;
 }
 
-int
-mp_rand (mp_int * a, int digits)
+int mp_rand(mp_int *a, int digits)
 {
-  int     res;
-  mp_digit d;
+   int     res;
+   mp_digit d;
 
-  mp_zero (a);
-  if (digits <= 0) {
-    return MP_OKAY;
-  }
+   mp_zero(a);
+   if (digits <= 0) {
+      return MP_OKAY;
+   }
 
-  /* first place a random non-zero digit */
-  do {
-    d = mp_gen_random();
-  } while (d == 0);
+   /* first place a random non-zero digit */
+   do {
+      d = s_gen_random();
+   } while (d == 0u);
 
-  if ((res = mp_add_d (a, d, a)) != MP_OKAY) {
-    return res;
-  }
-
-  while (--digits > 0) {
-    if ((res = mp_lshd (a, 1)) != MP_OKAY) {
+   if ((res = mp_add_d(a, d, a)) != MP_OKAY) {
       return res;
-    }
+   }
 
-    if ((res = mp_add_d (a, mp_gen_random(), a)) != MP_OKAY) {
-      return res;
-    }
-  }
+   while (--digits > 0) {
+      if ((res = mp_lshd(a, 1)) != MP_OKAY) {
+         return res;
+      }
 
-  return MP_OKAY;
+      if ((res = mp_add_d(a, s_gen_random(), a)) != MP_OKAY) {
+         return res;
+      }
+   }
+
+   return MP_OKAY;
 }
 #endif
 
-/* $Source$ */
-/* $Revision$ */
-/* $Date$ */
+/* ref:         $Format:%D$ */
+/* git commit:  $Format:%H$ */
+/* commit time: $Format:%ai$ */

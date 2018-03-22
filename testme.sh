@@ -27,6 +27,9 @@ _help()
   echo "    --with-cc=*             The compiler(s) to use for the tests"
   echo "        This is an option that will be iterated."
   echo
+  echo "    --test-vs-mtest=*       Run test vs. mtest for '*' operations."
+  echo "        Only the first of each options will be taken into account."
+  echo
   echo "To be able to specify options a compiler has to be given."
   echo "All options will be tested with all MP_xBIT configurations."
   echo
@@ -42,6 +45,10 @@ _help()
   echo "    --make-option=*         Give an option to make,"
   echo "                            e.g. --make-option=\"-f makefile.shared\""
   echo "        This is an option that will always be passed as parameter to make."
+  echo
+  echo "    --with-low-mp           Also build&run tests with -DMP_{8,16,32}BIT."
+  echo
+  echo "    --mtest-real-rand       Use real random data when running mtest."
   echo
   echo "Godmode:"
   echo
@@ -63,13 +70,28 @@ _die()
   fi
 }
 
-_runtest()
+_make()
 {
   echo -ne " Compile $1 $2"
+  suffix=$(echo ${1}${2}  | tr ' ' '_')
+  CC="$1" CFLAGS="$2 $TEST_CFLAGS" make -j$MAKE_JOBS $3 $MAKE_OPTIONS > /dev/null 2>gcc_errors_${suffix}.log
+  errcnt=$(wc -l < gcc_errors_${suffix}.log)
+  if [[ ${errcnt} -gt 1 ]]; then
+    echo " failed"
+    cat gcc_errors_${suffix}.log
+    exit 128
+  fi
+}
+
+
+_runtest()
+{
   make clean > /dev/null
-  CC="$1" CFLAGS="$2 $TEST_CFLAGS" make -j$MAKE_JOBS test_standalone $MAKE_OPTIONS > /dev/null 2>test_errors.txt
+  _make "$1" "$2" "test_standalone"
+  local _timeout=""
+  which timeout >/dev/null && _timeout="timeout --foreground 90"
   echo -e "\rRun test $1 $2"
-  timeout --foreground 90 ./test > test_$(echo ${1}${2}  | tr ' ' '_').txt || _die "running tests" $?
+  $_timeout ./test > test_${suffix}.log || _die "running tests" $?
 }
 
 _banner()
@@ -93,6 +115,9 @@ _exit()
 ARCHFLAGS=""
 COMPILERS=""
 CFLAGS=""
+WITH_LOW_MP=""
+TEST_VS_MTEST=""
+MTEST_RAND=""
 
 while [ $# -gt 0 ];
 do
@@ -109,19 +134,40 @@ do
     --make-option=*)
       MAKE_OPTIONS="$MAKE_OPTIONS ${1#*=}"
     ;;
+    --with-low-mp)
+      WITH_LOW_MP="1"
+    ;;
+    --test-vs-mtest=*)
+      TEST_VS_MTEST="${1#*=}"
+      if ! [ "$TEST_VS_MTEST" -eq "$TEST_VS_MTEST" ] 2> /dev/null
+      then
+         echo "--test-vs-mtest Parameter has to be int"
+         exit -1
+      fi
+    ;;
+    --mtest-real-rand)
+      MTEST_RAND="-DLTM_MTEST_REAL_RAND"
+    ;;
     --all)
       COMPILERS="gcc clang"
       ARCHFLAGS="-m64 -m32 -mx32"
     ;;
-    --help)
+    --help | -h)
       _help
+    ;;
+    *)
+      echo "Ignoring option ${1}"
     ;;
   esac
   shift
 done
 
-# default to gcc if nothing is given
-if [[ "$COMPILERS" == "" ]]
+# default to gcc if no compiler is defined but some other options
+if [[ "$COMPILERS" == "" ]] && [[ "$ARCHFLAGS$MAKE_OPTIONS$CFLAGS" != "" ]]
+then
+   COMPILERS="gcc"
+# default to gcc and run only default config if no option is given
+elif [[ "$COMPILERS" == "" ]]
 then
   _banner gcc
   _runtest "gcc" ""
@@ -138,6 +184,26 @@ then
 fi
 
 _banner
+
+if [[ "$TEST_VS_MTEST" != "" ]]
+then
+   make clean > /dev/null
+   _make "${compilers[0]} ${archflags[0]}" "$CFLAGS" "test"
+   echo
+   _make "gcc" "$MTEST_RAND" "mtest"
+   echo
+   echo "Run test vs. mtest for $TEST_VS_MTEST iterations"
+   for i in `seq 1 10` ; do sleep 500 && echo alive; done &
+   alive_pid=$!
+   _timeout=""
+   which timeout >/dev/null && _timeout="timeout --foreground 900"
+   $_TIMEOUT ./mtest/mtest $TEST_VS_MTEST | ./test > test.log
+   disown $alive_pid
+   kill $alive_pid 2>/dev/null
+   head -n 5 test.log
+   tail -n 2 test.log
+   exit 0
+fi
 
 for i in "${compilers[@]}"
 do
@@ -158,16 +224,17 @@ do
 
   for a in "${archflags[@]}"
   do
-    if [[ $(expr "$i" : "clang") && "$a" == "-mx32" ]]
+    if [[ $(expr "$i" : "clang") -ne 0 && "$a" == "-mx32" ]]
     then
       echo "clang -mx32 tests skipped"
       continue
     fi
 
-    _runtest "$i $a" ""
-    _runtest "$i $a" "-DMP_8BIT"
-    _runtest "$i $a" "-DMP_16BIT"
-    _runtest "$i $a" "-DMP_32BIT"
+    _runtest "$i $a" "$CFLAGS"
+    [ "$WITH_LOW_MP" != "1" ] && continue
+    _runtest "$i $a" "-DMP_8BIT $CFLAGS"
+    _runtest "$i $a" "-DMP_16BIT $CFLAGS"
+    _runtest "$i $a" "-DMP_32BIT $CFLAGS"
   done
 done
 
