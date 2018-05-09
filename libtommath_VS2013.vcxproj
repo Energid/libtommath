@@ -232,6 +232,7 @@
     <ClCompile Include="bn_mp_exptmod.c" />
     <ClCompile Include="bn_mp_exptmod_fast.c" />
     <ClCompile Include="bn_mp_expt_d.c" />
+    <ClCompile Include="bn_mp_expt_d_ex.c" />
     <ClCompile Include="bn_mp_exteuclid.c" />
     <ClCompile Include="bn_mp_fread.c" />
     <ClCompile Include="bn_mp_fwrite.c" />
@@ -266,6 +267,7 @@
     <ClCompile Include="bn_mp_mul_d.c" />
     <ClCompile Include="bn_mp_neg.c" />
     <ClCompile Include="bn_mp_n_root.c" />
+    <ClCompile Include="bn_mp_n_root_ex.c" />
     <ClCompile Include="bn_mp_or.c" />
     <ClCompile Include="bn_mp_prime_fermat.c" />
     <ClCompile Include="bn_mp_prime_is_divisible.c" />
