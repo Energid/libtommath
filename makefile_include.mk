@@ -20,15 +20,21 @@ endif
 ifeq ($(CC),cc)
   CC = $(CROSS_COMPILE)gcc
 endif
-LD=$(CROSS_COMPILE)ld
-AR=$(CROSS_COMPILE)ar
-RANLIB=$(CROSS_COMPILE)ranlib
+ifndef LD
+  LD=$(CROSS_COMPILE)ld
+endif
+ifndef AR
+  AR=$(CROSS_COMPILE)ar
+endif
+ifndef RANLIB
+  RANLIB=$(CROSS_COMPILE)ranlib
+endif
 
 ifndef MAKE
    MAKE=make
 endif
 
-CFLAGS += -I./ -Wall -Wsign-compare -Wextra -Wshadow
+CFLAGS += -I. -Wall -Wsign-compare -Wextra -Wshadow
 
 ifndef NO_ADDTL_WARNINGS
 # additional warnings
