@@ -34,9 +34,15 @@ endif # Clang
 endif # cc is Make's default
 endif # CROSS_COMPILE non-empty
 
-LD=$(CROSS_COMPILE)ld
-AR=$(CROSS_COMPILE)ar
-RANLIB=$(CROSS_COMPILE)ranlib
+ifndef LD
+  LD=$(CROSS_COMPILE)ld
+endif
+ifndef AR
+  AR=$(CROSS_COMPILE)ar
+endif
+ifndef RANLIB
+  RANLIB=$(CROSS_COMPILE)ranlib
+endif
 
 ifndef MAKE
 # BSDs refer to GNU Make as gmake
